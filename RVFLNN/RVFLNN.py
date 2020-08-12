@@ -16,6 +16,7 @@ class RVFLNN:
         self.enhance_number: int, the number of enhancement nodes
         self.W: np.ndarray, the weights of input patterns and enhancement nodes
         self.input_stored:
+        self.target_stored:
     Methods:
         predict(self,input_data,target_value=None)
         train(self, train_data, target_values, epoch, lr=0.001,)
@@ -40,23 +41,27 @@ class RVFLNN:
 
     def update_with_node(self):
         ''' Update the network with one additional enhancement node.'''
-        new_bias = np.random.rand(1,1)
+        new_bias = np.random.rand(1, 1)
         new_random_coef = np.random.normal(scale=0.5, size=(1, self.input_number))
-        a = np.dot(self.input_stored, new_random_coef.transpose())
+
+        a = (np.dot(new_random_coef, self.input_stored.transpose()) + new_bias).reshape(-1, 1)
         d = np.dot(pinv(self.input_layer().transpose()), a)
-        c = a - np.dot(self.input_layer().transpose(),d)
-        if (c < 10e-9).any():  # c' = 0
-            b = np.dot(d.transpose(),pinv(self.input_layer().transpose())) / (1 + np.dot(d.transpose(), d))
-        else:
-            b = pinv(c)
-        Y_n, _ = self.predict(input_data=self.input_stored)
-        Y_n = Y_n.transpose()
-        w_1 = self.W - np.dot(np.dot(d,b),Y_n).reshape(1,-1)
-        w_2 = np.array(np.dot(b, Y_n)).reshape(1,1)
-        self.W = np.concatenate([w_1,w_2],axis=1)
+        c = a - np.dot(self.input_layer().transpose(), d)
+        # b'
+        if (c < 10e-10).any():  # c' = 0
+            b_ = np.dot(d.transpose(), pinv(self.input_layer().transpose())) / (1 + np.dot(d.transpose(), d))
+        else: # c' != 0
+            b_ = pinv(c)
+        # update W
+        w1 = self.W - np.dot(np.dot(d, b_), self.target_stored.transpose()).reshape(1, -1)
+        w2 = np.dot(b_, self.target_stored.transpose())
+        self.W = np.concatenate([w1, w2], axis=1)
+
         self.bias = np.concatenate([self.bias, new_bias], axis=0)
-        self.random_coef = np.concatenate([self.random_coef,new_random_coef],axis=0)
+        self.random_coef = np.concatenate([self.random_coef, new_random_coef], axis=0)
         self.enhance_number += 1
+
+
 
     def __enhance__(self, input_vec, ):
         '''
@@ -114,6 +119,7 @@ class RVFLNN:
             r0 = r1
             s0 = s1
         self.input_stored = train_data
+        self.target_stored = target_values
 
 
 
